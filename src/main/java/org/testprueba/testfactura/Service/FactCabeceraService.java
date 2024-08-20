@@ -13,7 +13,12 @@ import org.testprueba.testfactura.Mappers.FactDetallesMapper;
 import org.testprueba.testfactura.Repository.FactCabeceraRepository;
 import org.testprueba.testfactura.Repository.FactDetalleRepository;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
 @Service
 
@@ -30,7 +35,9 @@ public class FactCabeceraService {
 
 
     public List<FactCabeceraDto> listarFacturas() {
-        List<FactCabecera> facturas = factCabeceraRepository.findAll();
+        String estado = "ACTIVO";
+        List<FactCabecera> facturas = factCabeceraRepository.findByEstado(estado);
+
         return factCabeceraMapper.toDtoList(facturas);
     }
 
@@ -47,20 +54,30 @@ public class FactCabeceraService {
     public FactCabeceraDto crearActualizarFactura(FactCabeceraDto factCabeceraDto) {
         // Convertir DTO a entidad
         FactCabecera factCabecera = factCabeceraMapper.toEntity(factCabeceraDto);
+        // Inicializar el total de la cabecera
+        Double total = 0.0;
 
-        // Iterar sobre los detalles y asignar la cabecera antes de guardar la cabecera
-        for (FactDetalleDto detalleDto : factCabeceraDto.getDetalles()) {
-            FactDetalle detalle = factDetallesMapper.toEntity(detalleDto);
-            detalle.setCabecera(factCabecera);  // Asignar la cabecera a cada detalle
-            factCabecera.getDetalles().add(detalle);  // Agregar el detalle a la cabecera
+        for (FactDetalle detalle : factCabecera.getDetalles()) {
+            // Calcular el subtotal como cantidad * precio
+            detalle.setSubtotal(detalle.getCantidad() * detalle.getPrecio().doubleValue());
+
+            // Sumar el subtotal al total de la cabecera
+            total += detalle.getSubtotal();
+
+            // Asignar la cabecera al detalle
+            detalle.setCabecera(factCabecera);
         }
 
-        // Guardar la cabecera y los detalles de una vez
+        // Asignar el total calculado a la cabecera
+        factCabecera.setTotal(total);
+
+        // Guardar la cabecera y los detalles de una vez (Hibernate gestionará los detalles)
         FactCabecera cabeceraGuardada = factCabeceraRepository.save(factCabecera);
 
         // Convertir la cabecera guardada a DTO para la respuesta
         return factCabeceraMapper.toDto(cabeceraGuardada);
     }
+
 
     @Transactional
     public FactCabeceraDto actualizarFactura(Long id, FactCabeceraDto factCabeceraDto) {
@@ -68,33 +85,97 @@ public class FactCabeceraService {
         FactCabecera facturaExistente = factCabeceraRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Factura no encontrada con id: " + id));
 
-        // Actualizar los campos de la entidad con los datos del DTO
+        // Actualizar los campos de la cabecera
         facturaExistente.setCi(factCabeceraDto.getCi());
         facturaExistente.setDireccion(factCabeceraDto.getDireccion());
         facturaExistente.setTelefono(factCabeceraDto.getTelefono());
         facturaExistente.setCliente(factCabeceraDto.getCliente());
         facturaExistente.setFecha(factCabeceraDto.getFecha());
 
-        // Actualizar detalles (opcional, dependiendo de la lógica de tu aplicación)
-        facturaExistente.getDetalles().clear();  // Limpiar los detalles existentes
+        // Crear un mapa de los detalles existentes para actualizarlos o eliminarlos según sea necesario
+        Map<Long, FactDetalle> detallesExistentesMap = facturaExistente.getDetalles().stream()
+                .collect(Collectors.toMap(FactDetalle::getId, Function.identity()));
+
+        // Crear una lista de nuevos detalles que se agregarán
+        List<FactDetalle> nuevosDetalles = new ArrayList<>();
+
+        // Iterar sobre los detalles del DTO
         for (FactDetalleDto detalleDto : factCabeceraDto.getDetalles()) {
-            FactDetalle detalle = factDetallesMapper.toEntity(detalleDto);
-            detalle.setCabecera(facturaExistente);  // Asignar la cabecera a cada detalle
-            facturaExistente.getDetalles().add(detalle);  // Agregar el detalle a la cabecera
+            if (detalleDto.getId() != null && detallesExistentesMap.containsKey(detalleDto.getId())) {
+                // Actualizar el detalle existente
+                FactDetalle detalleExistente = detallesExistentesMap.get(detalleDto.getId());
+                detalleExistente.setCantidad(detalleDto.getCantidad());
+                detalleExistente.setProducto(detalleDto.getProducto());
+                detalleExistente.setPrecio(detalleDto.getPrecio());
+                detalleExistente.setFechaRegistra(detalleDto.getFechaRegistra());
+                detalleExistente.setSubtotal(detalleDto.getCantidad() * detalleDto.getPrecio().doubleValue());
+                detallesExistentesMap.remove(detalleDto.getId());  // Remover el detalle del mapa (ya está procesado)
+            } else {
+                // Crear un nuevo detalle
+                FactDetalle nuevoDetalle = factDetallesMapper.toEntity(detalleDto);
+                nuevoDetalle.setCabecera(facturaExistente);
+                nuevoDetalle.setSubtotal(nuevoDetalle.getCantidad() * nuevoDetalle.getPrecio().doubleValue());
+                nuevosDetalles.add(nuevoDetalle);  // Agregar el nuevo detalle a la lista
+            }
         }
 
-        // Guardar la entidad actualizada en la base de datos
+        // Eliminar los detalles que no están en el DTO (detalles huérfanos)
+        facturaExistente.getDetalles().removeIf(detalle -> detallesExistentesMap.containsKey(detalle.getId()));
+
+        // Agregar los nuevos detalles a la cabecera
+        facturaExistente.getDetalles().addAll(nuevosDetalles);
+
+        // Calcular el nuevo total de la cabecera
+        Double total = facturaExistente.getDetalles().stream()
+                .mapToDouble(FactDetalle::getSubtotal)
+                .sum();
+        facturaExistente.setTotal(total);
+
+        // Guardar la cabecera actualizada en la base de datos
         FactCabecera facturaActualizada = factCabeceraRepository.save(facturaExistente);
 
-        // Convertir la entidad actualizada a DTO y retornarla
         return factCabeceraMapper.toDto(facturaActualizada);
     }
 
 
-    public void eliminarFactura(Long id) {
-        // Verificar si la factura existe antes de eliminarla
-        factCabeceraRepository.deleteById(id);
-        System.out.println("Eliminado correctamente el " + id);
+
+    @Transactional  // Asegura que se haga en una sola transacción
+    public FactCabeceraDto cambiarEstadoFactura(Long id) {
+        // Buscar la cabecera en el repositorio
+        FactCabecera factCabecera = factCabeceraRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Factura no encontrada con id: " + id));
+
+        // Verificar el estado actual
+        if ("ACTIVO".equals(factCabecera.getEstado())) {
+            // Cambiar el estado a "INACTIVO"
+            factCabecera.setEstado("INACTIVO");
+
+            // Guardar la entidad actualizada en la base de datos
+            FactCabecera cabeceraGuardada = factCabeceraRepository.save(factCabecera);
+
+            // Retornar la cabecera guardada como DTO
+            return factCabeceraMapper.toDto(cabeceraGuardada);
+        } else {
+            throw new IllegalStateException("La factura ya está inactiva o en un estado diferente");
+        }
+    }
+
+
+    public FactCabeceraDto consultarFactById(Long id) {
+        if (id == null) {
+            return null; // Si el ID es nulo, retornar null
+        }
+        try {
+            FactCabecera cabecera = factCabeceraRepository.findById(id).orElse(null); // Manejar la ausencia del registro con 'orElse(null)'
+            if (cabecera == null) {
+                return null; // Si no se encuentra, retornar null
+            } else {
+                FactCabeceraDto cabeceraDto = factCabeceraMapper.toDto(cabecera);
+                return cabeceraDto; // Retornar el DTO
+            }
+        } catch (Exception e) {
+            return null;
+        }
     }
 
 }

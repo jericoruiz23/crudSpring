@@ -12,20 +12,9 @@ public class FactDetalleDto {
     private BigDecimal precio;
     private Date fechaRegistra;
 
-
-
-    private boolean activo;
-
     public FactDetalleDto() {
     }
 
-    public boolean isActivo() {
-        return activo;
-    }
-
-    public void setActivo(boolean activo) {
-        this.activo = activo;
-    }
     public Long getId() {
         return id;
     }

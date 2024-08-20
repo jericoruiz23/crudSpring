@@ -10,6 +10,8 @@ public class FactCabeceraDto {
     private String telefono;
     private String cliente ;
     private Date fecha;
+    private String estado;
+    private Double total;
 
     private List<FactDetalleDto> detalles;
 
@@ -70,4 +72,19 @@ public class FactCabeceraDto {
 
     public void setDetalles(List<FactDetalleDto> detalles) { this.detalles = detalles; }
 
+    public String getEstado() {
+        return estado;
+    }
+
+    public void setEstado(String estado) {
+        this.estado = estado;
+    }
+
+    public Double getTotal() {
+        return total;
+    }
+
+    public void setTotal(Double total) {
+        this.total = total;
+    }
 }

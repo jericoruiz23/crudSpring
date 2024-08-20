@@ -14,30 +14,22 @@ public class FactDetalle {
     private Long id;
 
     private Integer cantidad;
-    private Double subtotal;
-    private String producto;
-    private BigDecimal precio;
     private Date fechaRegistra;
-    private boolean activo;
+    private BigDecimal precio;
+    private String producto;
+    private Double subtotal;
+
 
     @ManyToOne
-    @JoinColumn(name = "id_cab", referencedColumnName = "id", insertable = true, updatable = true)
+    @JoinColumn(name = "id_cab", referencedColumnName = "id")
     private FactCabecera cabecera;
-
-
 
     // Constructor por defecto
     public FactDetalle() {
     }
 
     // Getters y Setters
-    public boolean isActivo() {
-        return activo;
-    }
 
-    public void setActivo(boolean activo) {
-        this.activo = activo;
-    }
 
     public Long getId() {
         return id;

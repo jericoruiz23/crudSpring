@@ -23,7 +23,7 @@ public class FactCabeceraResource {
      private FactCabeceraService factCabeceraService;
 
     @PostMapping("/listar")
-    public ResponseEntity<?> getAllCabeceras() {
+    public ResponseEntity<?> getAllCabecerasActivas() {
         try {
             List<FactCabeceraDto> espectaculos = factCabeceraService.listarFacturas();
             return new ResponseEntity<>(espectaculos, HttpStatus.OK);
@@ -33,10 +33,10 @@ public class FactCabeceraResource {
         }
     }
 
-    @GetMapping("/listar/{id}")
-    public ResponseEntity<FactCabeceraDto> getFacturaPorId(@PathVariable Long id) {
+    @PostMapping("/listar/id")
+    public ResponseEntity<FactCabeceraDto> getFacturaPorId(@RequestBody FactCabeceraDto id) {
         try {
-            FactCabeceraDto facturaDto = factCabeceraService.buscarFacturaPorId(id);
+            FactCabeceraDto facturaDto = factCabeceraService.buscarFacturaPorId(id.getId());
             return new ResponseEntity<>(facturaDto, HttpStatus.OK);
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
@@ -49,7 +49,7 @@ public class FactCabeceraResource {
          return ResponseEntity.ok(facturaGuardada);
      }
 
-    @PutMapping("/actualizar/{id}")
+    @PostMapping("/actualizar/{id}")
     public ResponseEntity<FactCabeceraDto> actualizarFactura(@PathVariable Long id, @RequestBody FactCabeceraDto factCabeceraDto) {
         try {
             FactCabeceraDto facturaActualizada = factCabeceraService.actualizarFactura(id, factCabeceraDto);
@@ -59,10 +59,10 @@ public class FactCabeceraResource {
         }
     }
 
-    @DeleteMapping("/eliminar/{id}")
-    public ResponseEntity<Void> eliminarFactura(@PathVariable Long id) {
+    @PostMapping("/eliminar")
+    public ResponseEntity<Void> eliminarFactura(@RequestBody FactCabeceraDto id) {
         try {
-            factCabeceraService.eliminarFactura(id);
+            factCabeceraService.cambiarEstadoFactura(id.getId());
             return ResponseEntity.noContent().build();
         } catch (EntityNotFoundException e) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND); // 404: Not Found

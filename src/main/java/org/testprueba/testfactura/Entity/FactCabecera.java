@@ -14,12 +14,14 @@ public class FactCabecera {
     @Column(name = "id")
     private Long id;
     private String ci;
-    private String direccion;
-    private String telefono;
     private String cliente ;
+    private String direccion;
     private Date fecha;
+    private String telefono;
+    private String estado;
+    private Double total;
 
-    @OneToMany(mappedBy = "cabecera", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "cabecera", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<FactDetalle> detalles;
 
     public FactCabecera() {
@@ -73,11 +75,27 @@ public class FactCabecera {
         this.fecha = fecha;
     }
 
+    public String getEstado() {
+        return estado;
+    }
+
+    public void setEstado(String estado) {
+        this.estado = estado;
+    }
+
     public List<FactDetalle> getDetalles() {
         return detalles;
     }
 
     public void setDetalles(List<FactDetalle> detalles) {
         this.detalles = detalles;
+    }
+
+    public Double getTotal() {
+        return total;
+    }
+
+    public void setTotal(Double total) {
+        this.total = total;
     }
 }
